@@ -101,18 +101,56 @@ def scatter_plot_residual(data1, data2, name, slope, y_int, n_dev, r_mean, r_std
     plt.ylabel('Y')
     plt.show()
 
-x_list = [1.0,2.0,4.0,6.0,5.0,6.0,9.0,8.0,11.0,12.0]
-y_list = [14.0,10.0,12.0,9.0,8.0,6.0,4.0,3.0,3.0,10.0]
+
+# MAKE DATAFRAMES
+hitting_df = pd.read_csv('Hitting_stats', delim_whitespace=True)
+pitching_df = pd.read_csv('pitching_stats', delim_whitespace=True)
+# TURN HITTING DATAFRAMES INTO INDIVIDUAL LISTS
+OBP = list(hitting_df['OBP'])
+SLG = list(hitting_df['SLG'])
+AVG = list(hitting_df['AVG'])
+RBI = list(hitting_df['RBI'])
+H_WPCT = list(hitting_df['WPCT'])
+
+# CALCULATE HITTING CORRELATION TO WINNING PERCENTAGE
+OBP_to_W = cal_corr(OBP, H_WPCT)
+SLG_to_W = cal_corr(SLG, H_WPCT)
+AVG_to_W = cal_corr(AVG, H_WPCT)
+RBI_to_W = cal_corr(RBI, H_WPCT)
+
+# TURN PITCHING DATAFRAMES INTO INDIVIDUAL LISTS
+ERA = list(pitching_df['ERA'])
+SO = list(pitching_df['SO'])
+R = list(pitching_df['R'])
+HR = list(pitching_df['HR'])
+P_WPCT = list(pitching_df['WPCT'])
+
+# CALCULATE PITCHING CORRELATION TO WINNING PERCENTAGE
+ERA_to_W = cal_corr(ERA, P_WPCT)
+SO_to_W = cal_corr(SO, P_WPCT)
+R_to_W = cal_corr(R, P_WPCT)
+HR_to_W = cal_corr(HR, P_WPCT)
+
+# MAKE CORRELATION TABLES
+Hitting_corr_dict = {'Index':['H_WPCT'], 'OBP':[OBP_to_W], 'SLG':[SLG_to_W], 'AVG': [AVG_to_W], 'RBI': [RBI_to_W]}
+Hitting_corr_df = pd.DataFrame.from_dict(Hitting_corr_dict)
+print(Hitting_corr_df)
+print()
+Pitching_corr_dict = {'Index':['P_WPCT'], 'ERA':[ERA_to_W], 'SO':[SO_to_W], 'R': [R_to_W], 'HR': [HR_to_W]}
+Pitching_corr_df = pd.DataFrame.from_dict(Pitching_corr_dict)
+print(Pitching_corr_df)
 
 
-res_list, res_mean, res_std, slope, y_intercept = comp_residual(x_list, y_list)
+H_res_list, H_res_mean, H_res_std, H_slope, H_y_intercept = comp_residual(RBI, H_WPCT)
+scatter_plot_residual(RBI, H_WPCT, 'RUNS BATTED IN to WIN PERCENTAGE', H_slope, H_y_intercept, 2, H_res_mean, H_res_std)
 
-scatter_plot_residual(x_list, y_list, 'RESIDUAL_PLOT', slope, y_intercept, 2, res_mean, res_std)
+P_res_list, P_res_mean, P_res_std, P_slope, P_y_intercept = comp_residual(SO, P_WPCT)
+scatter_plot_residual(SO, P_WPCT, 'NUMBER OF STRIKEOUTS to WIN PERCENTAGE', P_slope, P_y_intercept, 2, P_res_mean, P_res_std)
 
+H_RSME = sqrt(sum(H_res_list))
+P_RSME = sqrt(sum(P_res_list))
 
-
-
-
+print(f'HITING RSME: {H_RSME}\nPITCHING RSME: {P_RSME}')
 
 
 
