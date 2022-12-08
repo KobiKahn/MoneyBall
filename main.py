@@ -7,8 +7,29 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from importlib import reload
 import seaborn as sb
-import statistics as stat
 
+def mean(data):
+    total = sum(data)
+    m = total / len(data)
+    return m
+
+def median(data):
+    data.sort()
+    if len(data) % 2 == 0:
+        m = (data[len(data) // 2] + data[len(data) // 2 - 1]) / 2
+    else:
+        m = data[len(data) // 2]
+    return m
+
+def variance(data):
+    new_list = [(val - mean(data)) ** 2 for val in data]
+    v = mean(new_list)
+    return v
+
+def stand_dev(data):
+    v = variance(data)
+    s = math.sqrt(v)
+    return s
 
 def cal_corr(list1, list2, option=0):
     if len(list1) == len(list2):
@@ -74,12 +95,12 @@ def comp_residual(x, y):
         val_list.append(val*a + b)
     for i in range(len(y)):
         r_list.append(y[i] - val_list[i])
-    r_mean = stat.mean(r_list)
-    r_std = stat.stdev(r_list)
+    r_mean = mean(r_list)
+    r_std = stand_dev(r_list)
     return(r_list, r_mean, r_std, a, b)
 
 
-def scatter_plot_residual(data1, data2, name, slope, y_int, n_dev, r_mean, r_std):
+def scatter_plot_residual(data1, data2, name,x_name, y_name, slope, y_int, n_dev, r_mean, r_std):
     y_vals = []
     l_bound = []
     u_bound = []
@@ -91,16 +112,34 @@ def scatter_plot_residual(data1, data2, name, slope, y_int, n_dev, r_mean, r_std
         l_bound.append((slope * x_data[val]) + y_int - (n_dev*r_std))
     for val in range(2):
         u_bound.append((slope * x_data[val]) + y_int + (n_dev*r_std))
-    plt.text(x_data[-1], y_vals[-1] + .2, f'Y={round(slope)}*X+{round(y_int)}', color='g')
+    plt.text(x_data[len(x_data) - 2], y_vals[-1] + .1, f'Y={round(slope, 3)}*X+{round(y_int, 3)}', color='g', fontsize=10)
     plt.plot(x_data, y_vals, '-r')
     plt.plot(x_data, l_bound, '--r')
     plt.plot(x_data, u_bound, '--r')
     plt.scatter(data1, data2)
     plt.title(f'{name}')
-    plt.xlabel('X')
-    plt.ylabel('Y')
+    plt.xlabel(f'{x_name}')
+    plt.ylabel(f'{y_name}')
     plt.show()
 
+
+def calc_RSME(res_list):
+    new_list = []
+    res_len = len(res_list)
+    for val in res_list:
+        new_list.append(val**2)
+    RSME = (sqrt(sum(new_list) / res_len)).real
+    return(RSME)
+
+
+def delete_outliers(list1, list2, slope, y_int, ndev, r_std):
+    for val in range(len(list1)):
+        y1 = ((slope * list1[val - 1]) + y_int - (ndev*r_std))
+        y2 = ((slope * list1[val - 1]) + y_int + (ndev*r_std))
+        if list2[val - 1] > y2 or list2[val - 1] < y1:
+            list2.pop(val - 1)
+            list1.pop(val - 1)
+    return(list1, list2)
 
 # MAKE DATAFRAMES
 hitting_df = pd.read_csv('Hitting_stats', delim_whitespace=True)
@@ -141,16 +180,30 @@ Pitching_corr_df = pd.DataFrame.from_dict(Pitching_corr_dict)
 print(Pitching_corr_df)
 
 
+# MAKE RESIDUAL LISTS
 H_res_list, H_res_mean, H_res_std, H_slope, H_y_intercept = comp_residual(RBI, H_WPCT)
-scatter_plot_residual(RBI, H_WPCT, 'RUNS BATTED IN to WIN PERCENTAGE', H_slope, H_y_intercept, 2, H_res_mean, H_res_std)
+P_res_list, P_res_mean, P_res_std, P_slope, P_y_intercept = comp_residual(ERA, P_WPCT)
 
-P_res_list, P_res_mean, P_res_std, P_slope, P_y_intercept = comp_residual(SO, P_WPCT)
-scatter_plot_residual(SO, P_WPCT, 'NUMBER OF STRIKEOUTS to WIN PERCENTAGE', P_slope, P_y_intercept, 2, P_res_mean, P_res_std)
+#DELETE OUTLIERS
+RBI, H_WPCT = delete_outliers(RBI, H_WPCT, H_slope, H_y_intercept, 2, H_res_std)
+ERA, P_WPCT = delete_outliers(ERA, P_WPCT, P_slope, P_y_intercept, 2, P_res_std)
 
-H_RSME = sqrt(sum(H_res_list))
-P_RSME = sqrt(sum(P_res_list))
+# MAKE NEW RESIDUALS
+N_H_res_list, N_H_res_mean, H_res_std, H_slope, H_y_intercept = comp_residual(RBI, H_WPCT)
+N_P_res_list, N_P_res_mean, P_res_std, P_slope, P_y_intercept = comp_residual(ERA, P_WPCT)
+#PLOT GRAPHS
+scatter_plot_residual(RBI, H_WPCT, 'RUNS BATTED IN to WIN PERCENTAGE', '# RUNS', 'WIN PERCENTAGE', H_slope, H_y_intercept, 2, N_H_res_mean, H_res_std)
+scatter_plot_residual(ERA, P_WPCT, 'EARNED RUN AVERAGE to WIN PERCENTAGE', '# EARNED RUN AVERAGE', 'WIN PERCENTAGE', P_slope, P_y_intercept, 2, N_P_res_mean, P_res_std)
+
+# CALCULATE RESIDUALS
+H_RSME = calc_RSME(H_res_list)
+P_RSME = calc_RSME(P_res_list)
 
 print(f'HITING RSME: {H_RSME}\nPITCHING RSME: {P_RSME}')
 
-
-
+if P_RSME == H_RSME:
+    print('THEY ARE THE SAME')
+elif P_RSME > H_RSME:
+    print('HITTING IS BETTER')
+else:
+    print('PITCHING IS BETTER')
