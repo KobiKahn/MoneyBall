@@ -141,9 +141,30 @@ def delete_outliers(list1, list2, slope, y_int, ndev, r_std):
             list1.pop(val - 1)
     return(list1, list2)
 
+
+def multi_linear_regression(x1, x2, y):
+    x1_squared = x1 ** 2
+    x2_squared = x2**2
+    x1y = x1 * y
+    x2y = y * x2
+    x1x2 = x1*x2
+    N = len(x1)
+    ans_list = []
+    left_matrix = [[sum(x1_squared), sum(x1x2), sum(x1)], [sum(x1x2), sum(x2_squared), sum(x2)], [sum(x1), sum(x2), N]]
+    right_matrix = [[sum(x1y)], [sum(x2y)], [sum(y)]]
+    inv_mat_left = np.linalg.inv(left_matrix)
+    solution = np.dot(inv_mat_left, right_matrix)
+    x1_coeff, x2_coeff, con_coeff = solution[0], solution[1], solution[2]
+
+    for i in range(N):
+        ans_list.append(sum( (y[i] - (x1_coeff*x1[i] + x2_coeff*x2[i] + con_coeff))**2))
+    return(ans_list)
+
+
 # MAKE DATAFRAMES
 hitting_df = pd.read_csv('Hitting_stats', delim_whitespace=True)
 pitching_df = pd.read_csv('pitching_stats', delim_whitespace=True)
+pitching_df = pitching_df.sort_values('WPCT')
 # TURN HITTING DATAFRAMES INTO INDIVIDUAL LISTS
 OBP = list(hitting_df['OBP'])
 SLG = list(hitting_df['SLG'])
@@ -191,15 +212,22 @@ ERA, P_WPCT = delete_outliers(ERA, P_WPCT, P_slope, P_y_intercept, 2, P_res_std)
 # MAKE NEW RESIDUALS
 N_H_res_list, N_H_res_mean, H_res_std, H_slope, H_y_intercept = comp_residual(RBI, H_WPCT)
 N_P_res_list, N_P_res_mean, P_res_std, P_slope, P_y_intercept = comp_residual(ERA, P_WPCT)
+
 #PLOT GRAPHS
-scatter_plot_residual(RBI, H_WPCT, 'RUNS BATTED IN to WIN PERCENTAGE', '# RUNS', 'WIN PERCENTAGE', H_slope, H_y_intercept, 2, N_H_res_mean, H_res_std)
-scatter_plot_residual(ERA, P_WPCT, 'EARNED RUN AVERAGE to WIN PERCENTAGE', '# EARNED RUN AVERAGE', 'WIN PERCENTAGE', P_slope, P_y_intercept, 2, N_P_res_mean, P_res_std)
+# scatter_plot_residual(RBI, H_WPCT, 'RUNS BATTED IN to WIN PERCENTAGE', '# RUNS', 'WIN PERCENTAGE', H_slope, H_y_intercept, 2, N_H_res_mean, H_res_std)
+# scatter_plot_residual(ERA, P_WPCT, 'EARNED RUN AVERAGE to WIN PERCENTAGE', '# EARNED RUN AVERAGE', 'WIN PERCENTAGE', P_slope, P_y_intercept, 2, N_P_res_mean, P_res_std)
+
+# FIND bi_linear fit
+combined_list = multi_linear_regression(np.array(RBI), np.array(ERA), np.array(H_WPCT))
+# print(combined_list)
 
 # CALCULATE RESIDUALS
 H_RSME = calc_RSME(H_res_list)
 P_RSME = calc_RSME(P_res_list)
+combined_RSME = calc_RSME(combined_list)
 
-print(f'HITING RSME: {H_RSME}\nPITCHING RSME: {P_RSME}')
+
+print(f'HITING RSME: {H_RSME}\nPITCHING RSME: {P_RSME}\nCOMBINED RSME: {combined_RSME}')
 
 if P_RSME == H_RSME:
     print('THEY ARE THE SAME')
